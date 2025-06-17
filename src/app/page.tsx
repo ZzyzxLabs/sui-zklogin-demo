@@ -1,103 +1,76 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState } from 'react'
+
+export default function ZkLoginPage() {
+  const [step, setStep] = useState(0)
+  const [output, setOutput] = useState<string | null>(null)
+
+  const steps = [
+    "Step 1: Generate ephemeral key pair",
+    "Step 2: Generate randomness and nonce",
+    "Step 3: Get JWT from OAuth provider",
+    "Step 4: Decode JWT claims",
+    "Step 5: Derive zkLogin address",
+    "Step 6: Sign transaction with zk proof"
+  ]
+
+  const handleRunStep = async () => {
+    switch (step) {
+      case 0: {
+        const { Ed25519Keypair } = await import('@mysten/sui/keypairs/ed25519')
+        const keypair = new Ed25519Keypair()
+        setOutput(`Public Key: ${keypair.getPublicKey().toBase64()}`)
+        break
+      }
+      case 1: {
+        const { generateRandomness, generateNonce } = await import('@mysten/sui/zklogin')
+        const { Ed25519Keypair } = await import('@mysten/sui/keypairs/ed25519')
+        const ephemeralKeyPair = new Ed25519Keypair()
+        const randomness = generateRandomness()
+        const maxEpoch = 12345 // Replace with actual
+        const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness)
+        setOutput(`Randomness: ${randomness}\nNonce: ${nonce}`)
+        break
+      }
+      case 2:
+        setOutput('Redirect to OAuth provider to obtain a JWT token (e.g. Google Sign-In)')
+        break
+      case 3:
+        setOutput('Use a JWT parser to extract claims: sub, iss, aud')
+        break
+      case 4:
+        setOutput('Use claims + userSalt to deterministically derive zkLogin address')
+        break
+      case 5:
+        setOutput('Sign transaction using zk proof + ephemeral signature')
+        break
+      default:
+        setOutput(null)
+    }
+
+    if (step < steps.length - 1) {
+      setStep(prev => prev + 1)
+    }
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="p-6 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">zkLogin Walkthrough</h1>
+      <p className="mb-2 font-medium">{steps[step]}</p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+      <button
+        onClick={handleRunStep}
+        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+      >
+        {step < steps.length - 1 ? 'Run Step' : 'Done'}
+      </button>
+
+      {output && (
+        <pre className="mt-4 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm">
+          {output}
+        </pre>
+      )}
+    </main>
+  )
 }
