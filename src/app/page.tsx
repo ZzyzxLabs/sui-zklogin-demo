@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
+import { generateRandomness, generateNonce } from '@mysten/sui/zklogin'
 
 export default function ZkLoginPage() {
   const [results, setResults] = useState<(string | null)[]>(Array(6).fill(null))
@@ -88,7 +90,7 @@ export default function ZkLoginPage() {
               </button>
             </div>
             {results[index] && (
-              <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm">
+              <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
                 {results[index]}
               </pre>
             )}

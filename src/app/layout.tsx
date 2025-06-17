@@ -1,4 +1,6 @@
 // app/layout.tsx
+import './globals.css'
+
 export const metadata = {
   title: 'zkLogin Demo',
   description: 'Step-by-step walkthrough of zkLogin flow',
