@@ -1,8 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
-import { generateRandomness, generateNonce } from '@mysten/sui/zklogin'
+import { generateEphemeralKeyPair } from './steps/Step1'
+import { generateRandomnessAndNonce } from './steps/Step2'
+import { getJwtFromOAuth } from './steps/Step3'
+import { decodeJwtClaims } from './steps/Step4'
+import { deriveZkLoginAddress } from './steps/Step5'
+import { signTransaction } from './steps/Step6'
 
 export default function ZkLoginPage() {
   const [results, setResults] = useState<(string | null)[]>(Array(6).fill(null))
@@ -19,57 +23,59 @@ export default function ZkLoginPage() {
   const runStep = async (stepIndex: number) => {
     switch (stepIndex) {
       case 0: {
-        const { Ed25519Keypair } = await import('@mysten/sui/keypairs/ed25519')
-        const keypair = new Ed25519Keypair()
+        const result = await generateEphemeralKeyPair()
         setResults(prev => {
           const newResults = [...prev]
-          newResults[0] = `Public Key: ${keypair.getPublicKey().toBase64()}`
+          newResults[0] = result
           return newResults
         })
         break
       }
       case 1: {
-        const { generateRandomness, generateNonce } = await import('@mysten/sui/zklogin')
-        const { Ed25519Keypair } = await import('@mysten/sui/keypairs/ed25519')
-        const ephemeralKeyPair = new Ed25519Keypair()
-        const randomness = generateRandomness()
-        const maxEpoch = 12345 // Replace with actual
-        const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness)
+        const result = await generateRandomnessAndNonce()
         setResults(prev => {
           const newResults = [...prev]
-          newResults[1] = `Randomness: ${randomness}\nNonce: ${nonce}`
+          newResults[1] = result
           return newResults
         })
         break
       }
-      case 2:
+      case 2: {
+        const result = await getJwtFromOAuth()
         setResults(prev => {
           const newResults = [...prev]
-          newResults[2] = 'Redirect to OAuth provider to obtain a JWT token (e.g. Google Sign-In)'
+          newResults[2] = result
           return newResults
         })
         break
-      case 3:
+      }
+      case 3: {
+        const result = await decodeJwtClaims()
         setResults(prev => {
           const newResults = [...prev]
-          newResults[3] = 'Use a JWT parser to extract claims: sub, iss, aud'
+          newResults[3] = result
           return newResults
         })
         break
-      case 4:
+      }
+      case 4: {
+        const result = await deriveZkLoginAddress()
         setResults(prev => {
           const newResults = [...prev]
-          newResults[4] = 'Use claims + userSalt to deterministically derive zkLogin address'
+          newResults[4] = result
           return newResults
         })
         break
-      case 5:
+      }
+      case 5: {
+        const result = await signTransaction()
         setResults(prev => {
           const newResults = [...prev]
-          newResults[5] = 'Sign transaction using zk proof + ephemeral signature'
+          newResults[5] = result
           return newResults
         })
         break
+      }
     }
   }
 
