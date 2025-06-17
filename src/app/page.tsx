@@ -4,6 +4,12 @@ import { useState, useEffect } from "react";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { generateRandomness, generateNonce } from "@mysten/sui/zklogin";
 import { SuiClient } from "@mysten/sui/client";
+import { poseidonHash } from "@mysten/sui/zklogin";
+
+// Helper function to convert base64 to base64url
+function base64ToBase64Url(base64: string): string {
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
 
 interface JWTData {
   sub: string;
@@ -13,11 +19,35 @@ interface JWTData {
   [key: string]: any;
 }
 
+interface Step1Data {
+  publicKey: string;
+  randomness: string;
+  nonce: string;
+  maxEpoch: number;
+}
+
 export default function ZkLoginPage() {
   const [results, setResults] = useState<(string | null)[]>(
     Array(6).fill(null)
   );
   const [jwtData, setJwtData] = useState<JWTData | null>(null);
+  const [ephemeralKeyPair, setEphemeralKeyPair] =
+    useState<Ed25519Keypair | null>(null);
+  const [maxEpoch, setMaxEpoch] = useState<number | null>(null);
+  const [randomness, setRandomness] = useState<string | null>(null);
+
+  // Restore step 1 results from localStorage on initial load
+  useEffect(() => {
+    const savedStep1Data = localStorage.getItem("step1Data");
+    if (savedStep1Data) {
+      const step1Data: Step1Data = JSON.parse(savedStep1Data);
+      setResults((prev) => {
+        const newResults = [...prev];
+        newResults[0] = `Ephemeral Public Key: ${step1Data.publicKey}\nRandomness: ${step1Data.randomness}\nNonce: ${step1Data.nonce}\nMax Epoch: ${step1Data.maxEpoch}`;
+        return newResults;
+      });
+    }
+  }, []);
 
   // Handle JWT data from OAuth callback
   useEffect(() => {
@@ -63,19 +93,54 @@ export default function ZkLoginPage() {
         const FULLNODE_URL = "https://fullnode.testnet.sui.io";
         const suiClient = new SuiClient({ url: FULLNODE_URL });
         const { epoch } = await suiClient.getLatestSuiSystemState();
-        const maxEpoch = Number(epoch) + 2;
-        const ephemeralKeyPair = new Ed25519Keypair();
-        const randomness = generateRandomness();
-        const nonce = generateNonce(
-          ephemeralKeyPair.getPublicKey(),
-          maxEpoch,
-          randomness
+        const epochNum = Number(epoch) + 2;
+        setMaxEpoch(epochNum);
+
+        const keypair = new Ed25519Keypair();
+        setEphemeralKeyPair(keypair);
+
+        const rand = generateRandomness();
+        setRandomness(rand);
+
+        // Get the ephemeral public key as BigInt
+        const publicKey = keypair.getPublicKey().toBase64();
+        const publicKeyBigInt = BigInt(
+          "0x" + Buffer.from(publicKey, "base64").toString("hex")
         );
+
+        // Split the public key into two 128-bit integers
+        const publicKeyHigh = publicKeyBigInt >> BigInt(128);
+        const publicKeyLow =
+          publicKeyBigInt & ((BigInt(1) << BigInt(128)) - BigInt(1));
+
+        // Compute the nonce using Poseidon hash
+        const nonce = poseidonHash([
+          publicKeyHigh,
+          publicKeyLow,
+          BigInt(epochNum),
+          BigInt("0x" + rand),
+        ]);
+
+        // Convert to base64url format and take last 20 bytes
+        const nonceBytes = Buffer.from(
+          nonce.toString(16).padStart(64, "0"),
+          "hex"
+        );
+        const nonceBase64 = nonceBytes.slice(-20).toString("base64");
+        const nonceBase64Url = base64ToBase64Url(nonceBase64);
+
+        // Save step 1 data to localStorage
+        const step1Data: Step1Data = {
+          publicKey,
+          randomness: rand,
+          nonce: nonceBase64Url,
+          maxEpoch: epochNum,
+        };
+        localStorage.setItem("step1Data", JSON.stringify(step1Data));
+
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[0] = `Ephemeral Public Key: ${ephemeralKeyPair
-            .getPublicKey()
-            .toBase64()}\nRandomness: ${randomness}\nNonce: ${nonce}\nMax Epoch: ${maxEpoch}`;
+          newResults[0] = `Ephemeral Public Key: ${publicKey}\nRandomness: ${rand}\nNonce: ${nonceBase64Url}\nMax Epoch: ${epochNum}`;
           return newResults;
         });
         break;
