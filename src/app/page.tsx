@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { generateEphemeralKeyPair } from './steps/Step1'
-import { generateRandomnessAndNonce } from './steps/Step2'
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519'
+import { generateRandomness, generateNonce } from '@mysten/sui/zklogin'
 import { getJwtFromOAuth } from './steps/Step3'
 import { decodeJwtClaims } from './steps/Step4'
 import { deriveZkLoginAddress } from './steps/Step5'
@@ -23,19 +23,22 @@ export default function ZkLoginPage() {
   const runStep = async (stepIndex: number) => {
     switch (stepIndex) {
       case 0: {
-        const result = await generateEphemeralKeyPair()
+        const keypair = new Ed25519Keypair()
         setResults(prev => {
           const newResults = [...prev]
-          newResults[0] = result
+          newResults[0] = `Public Key: ${keypair.getPublicKey().toBase64()}`
           return newResults
         })
         break
       }
       case 1: {
-        const result = await generateRandomnessAndNonce()
+        const ephemeralKeyPair = new Ed25519Keypair()
+        const randomness = generateRandomness()
+        const maxEpoch = 12345 // Replace with actual
+        const nonce = generateNonce(ephemeralKeyPair.getPublicKey(), maxEpoch, randomness)
         setResults(prev => {
           const newResults = [...prev]
-          newResults[1] = result
+          newResults[1] = `Randomness: ${randomness}\nNonce: ${nonce}`
           return newResults
         })
         break
