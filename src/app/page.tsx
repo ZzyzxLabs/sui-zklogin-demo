@@ -1,14 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { generateRandomness, generateNonce } from "@mysten/sui/zklogin";
 import { SuiClient } from "@mysten/sui/client";
+
+interface JWTData {
+  sub: string;
+  email: string;
+  name: string;
+  nonce: string;
+  [key: string]: any;
+}
 
 export default function ZkLoginPage() {
   const [results, setResults] = useState<(string | null)[]>(
     Array(6).fill(null)
   );
+  const [jwtData, setJwtData] = useState<JWTData | null>(null);
+
+  // Handle JWT data from OAuth callback
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const jwtParam = url.searchParams.get("jwt");
+
+    if (jwtParam) {
+      try {
+        const jwt = JSON.parse(jwtParam);
+        setJwtData(jwt);
+
+        // Update step 2 result to show JWT data
+        setResults((prev) => {
+          const newResults = [...prev];
+          newResults[1] = `JWT received:\nSub: ${jwt.sub}\nEmail: ${jwt.email}\nName: ${jwt.name}\nNonce: ${jwt.nonce}`;
+          return newResults;
+        });
+
+        // Clear the URL parameters
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname
+        );
+      } catch (error) {
+        console.error("Error parsing JWT:", error);
+      }
+    }
+  }, []);
 
   const steps = [
     "Step 1: Setup key pair and randomness",
@@ -93,36 +131,75 @@ export default function ZkLoginPage() {
         break;
       }
       case 2: {
+        if (!jwtData) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[2] =
+              "Error: No JWT data available. Please complete Step 2 first.";
+            return newResults;
+          });
+          return;
+        }
+
+        // Here you would typically make a call to your salt service
+        // For now, we'll just show a placeholder
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[2] =
-            "Register new salt or fetch existing salt for the user";
+          newResults[2] = `Using JWT data to register/fetch salt:\nSub: ${jwtData.sub}\nEmail: ${jwtData.email}`;
           return newResults;
         });
         break;
       }
       case 3: {
+        if (!jwtData) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[3] =
+              "Error: No JWT data available. Please complete Step 2 first.";
+            return newResults;
+          });
+          return;
+        }
+
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[3] = "Derive zkLogin address using JWT claims and salt";
+          newResults[3] = `Deriving zkLogin address using JWT claims:\nSub: ${jwtData.sub}\nEmail: ${jwtData.email}`;
           return newResults;
         });
         break;
       }
       case 4: {
+        if (!jwtData) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[4] =
+              "Error: No JWT data available. Please complete Step 2 first.";
+            return newResults;
+          });
+          return;
+        }
+
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[4] =
-            "Generate zero-knowledge proof using JWT claims and ephemeral key";
+          newResults[4] = `Generating zero-knowledge proof using JWT claims:\nSub: ${jwtData.sub}\nEmail: ${jwtData.email}`;
           return newResults;
         });
         break;
       }
       case 5: {
+        if (!jwtData) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[5] =
+              "Error: No JWT data available. Please complete Step 2 first.";
+            return newResults;
+          });
+          return;
+        }
+
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[5] =
-            "Sign transaction using zk proof and ephemeral signature";
+          newResults[5] = `Signing transaction using zk proof and JWT data:\nSub: ${jwtData.sub}\nEmail: ${jwtData.email}`;
           return newResults;
         });
         break;
