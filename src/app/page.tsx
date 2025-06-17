@@ -21,6 +21,7 @@ interface JWTData {
 
 interface Step1Data {
   publicKey: string;
+  privateKey: string;
   randomness: string;
   nonce: string;
   maxEpoch: number;
@@ -79,7 +80,7 @@ export default function ZkLoginPage() {
   }, []);
 
   const steps = [
-    "Step 1: Setup key pair and randomness",
+    "Step 1: Generate ephemeral key pair, JWT randomness, and nonce",
     "Step 2: Get JWT from OAuth provider",
     "Step 3: Register or fetch salt",
     "Step 4: Derive zkLogin address",
@@ -92,55 +93,28 @@ export default function ZkLoginPage() {
       case 0: {
         const FULLNODE_URL = "https://fullnode.testnet.sui.io";
         const suiClient = new SuiClient({ url: FULLNODE_URL });
-        const { epoch } = await suiClient.getLatestSuiSystemState();
-        const epochNum = Number(epoch) + 2;
-        setMaxEpoch(epochNum);
+        const { epoch, epochDurationMs, epochStartTimestampMs } =
+          await suiClient.getLatestSuiSystemState();
 
-        const keypair = new Ed25519Keypair();
-        setEphemeralKeyPair(keypair);
-
-        const rand = generateRandomness();
-        setRandomness(rand);
-
-        // Get the ephemeral public key as BigInt
-        const publicKey = keypair.getPublicKey().toBase64();
-        const publicKeyBigInt = BigInt(
-          "0x" + Buffer.from(publicKey, "base64").toString("hex")
-        );
-
-        // Split the public key into two 128-bit integers
-        const publicKeyHigh = publicKeyBigInt >> BigInt(128);
-        const publicKeyLow =
-          publicKeyBigInt & ((BigInt(1) << BigInt(128)) - BigInt(1));
-
-        // Compute the nonce using Poseidon hash
-        const nonce = poseidonHash([
-          publicKeyHigh,
-          publicKeyLow,
-          BigInt(epochNum),
-          BigInt("0x" + rand),
-        ]);
-
-        // Convert to base64url format and take last 20 bytes
-        const nonceBytes = Buffer.from(
-          nonce.toString(16).padStart(64, "0"),
-          "hex"
-        );
-        const nonceBase64 = nonceBytes.slice(-20).toString("base64");
-        const nonceBase64Url = base64ToBase64Url(nonceBase64);
+        const maxEpoch = Number(epoch) + 2; // this means the ephemeral key will be active for 2 epochs from now.
+        const ephemeralKeyPair = new Ed25519Keypair();
+        const publicKey = ephemeralKeyPair.getPublicKey();
+        const randomness = generateRandomness();
+        const nonce = generateNonce(publicKey, maxEpoch, randomness);
 
         // Save step 1 data to localStorage
         const step1Data: Step1Data = {
-          publicKey,
-          randomness: rand,
-          nonce: nonceBase64Url,
-          maxEpoch: epochNum,
+          publicKey: publicKey.toBase64(),
+          privateKey: ephemeralKeyPair.getSecretKey(),
+          randomness,
+          nonce,
+          maxEpoch,
         };
         localStorage.setItem("step1Data", JSON.stringify(step1Data));
 
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[0] = `Ephemeral Public Key: ${publicKey}\nRandomness: ${rand}\nNonce: ${nonceBase64Url}\nMax Epoch: ${epochNum}`;
+          newResults[0] = `⚠️ WARNING: This is a demo. DO NOT use these keys for real money transactions! ⚠️\n\nMax Epoch: ${maxEpoch}\nPublic Key: ${publicKey.toBase64()}\nPrivate Key: ${ephemeralKeyPair.getSecretKey()}\nRandomness: ${randomness}\nNonce: ${nonce}`;
           return newResults;
         });
         break;
@@ -273,8 +247,8 @@ export default function ZkLoginPage() {
   };
 
   return (
-    <main className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">zkLogin Walkthrough</h1>
+    <main className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">zkLogin Demo</h1>
 
       <div className="space-y-6">
         {steps.map((step, index) => (
