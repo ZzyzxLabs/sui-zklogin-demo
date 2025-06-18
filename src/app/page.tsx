@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { generateRandomness, generateNonce } from "@mysten/sui/zklogin";
 import { SuiClient } from "@mysten/sui/client";
 import { jwtDecode } from "jwt-decode";
+import { jwtToAddress } from "@mysten/sui/zklogin";
 
 interface JwtPayload {
   iss?: string;
@@ -29,10 +30,15 @@ export default function ZkLoginPage() {
     Array(6).fill(null)
   );
   const [jwt, setJwt] = useState<JwtPayload | null>(null);
+  const [idToken, setIdToken] = useState<string | null>(null);
   const [ephemeralKeyPair, setEphemeralKeyPair] =
     useState<Ed25519Keypair | null>(null);
   const [maxEpoch, setMaxEpoch] = useState<number | null>(null);
   const [randomness, setRandomness] = useState<string | null>(null);
+
+  // Remove userSalt state, use ref instead
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Restore step 1 results from sessionStorage on initial load
   useEffect(() => {
@@ -53,20 +59,18 @@ export default function ZkLoginPage() {
     if (window.location.hash) {
       const params = new URLSearchParams(window.location.hash.slice(1));
       const idToken = params.get("id_token");
+      console.log("idToken", idToken);
       if (idToken) {
         try {
           // Use jwtDecode to decode the id_token
           const payload = jwtDecode<JwtPayload>(idToken);
           setJwt(payload);
+          setIdToken(idToken);
           setResults((prev) => {
             const newResults = [...prev];
             newResults[1] = `JWT received:\nIssuer: ${
               payload.iss ?? ""
-            }\nSub: ${payload.sub ?? ""}\nAudience: ${
-              payload.aud ?? ""
-            }\nExpires: ${payload.exp ?? ""}\nNot Before: ${
-              payload.nbf ?? ""
-            }\nIssued At: ${payload.iat ?? ""}\nJWT ID: ${payload.jti ?? ""}`;
+            }\nSubject: ${payload.sub ?? ""}\nAudience: ${payload.aud ?? ""}`;
             return newResults;
           });
           // Optionally, clear the hash from the URL
@@ -169,25 +173,47 @@ export default function ZkLoginPage() {
         break;
       }
       case 2: {
-        if (!jwt) {
+        // Get the password from the input ref
+        const inputValue = passwordInputRef.current?.value || "";
+        if (!inputValue) {
           setResults((prev) => {
             const newResults = [...prev];
-            newResults[2] =
-              "Error: No JWT data available. Please complete Step 2 first.";
+            newResults[2] = "Please enter a password.";
             return newResults;
           });
-          return;
+          break;
         }
-
-        // Here you would typically make a call to your salt service
-        // For now, we'll just show a placeholder
-        setResults((prev) => {
-          const newResults = [...prev];
-          newResults[2] = `Using JWT data to register/fetch salt:\nSub: ${
-            jwt.sub ?? ""
-          }`;
-          return newResults;
-        });
+        // Convert to bigint and store in sessionStorage as string
+        try {
+          const hexString = Array.from(inputValue)
+            .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
+            .join("");
+          const saltBigInt = BigInt("0x" + hexString);
+          sessionStorage.setItem("userSalt", saltBigInt.toString());
+          // If idToken and userSalt are present, derive the address
+          const userSaltStr = sessionStorage.getItem("userSalt");
+          if (idToken && userSaltStr) {
+            const derivedAddress = jwtToAddress(idToken, userSaltStr);
+            setResults((prev) => {
+              const newResults = [...prev];
+              newResults[2] = `Password (userSalt) saved as bigint.\nDerived zkLogin address: ${derivedAddress}`;
+              return newResults;
+            });
+          } else {
+            setResults((prev) => {
+              const newResults = [...prev];
+              newResults[2] =
+                "Please ensure both JWT and password are available.";
+              return newResults;
+            });
+          }
+        } catch (err) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[2] = `Error converting password to bigint: ${err}`;
+            return newResults;
+          });
+        }
         break;
       }
       case 3: {
@@ -257,25 +283,132 @@ export default function ZkLoginPage() {
     <main className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">zkLogin Demo</h1>
 
-      <div className="space-y-6">
-        {steps.map((step, index) => (
-          <div key={index} className="border rounded p-4">
-            <div className="flex justify-between items-center mb-2">
-              <p className="font-medium">{step}</p>
-              <button
-                onClick={() => runStep(index)}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-              >
-                Run Step {index + 1}
-              </button>
-            </div>
-            {results[index] && (
-              <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-                {results[index]}
-              </pre>
-            )}
+      {/* Step 1 */}
+      <div className="border rounded p-4 mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="font-medium">
+            Step 1: Generate ephemeral key pair, JWT randomness, and nonce
+          </p>
+          <button
+            onClick={() => runStep(0)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+          >
+            Run Step 1
+          </button>
+        </div>
+        {results[0] && (
+          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
+            {results[0]}
+          </pre>
+        )}
+      </div>
+
+      {/* Step 2 */}
+      <div className="border rounded p-4 mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="font-medium">Step 2: Get JWT from OAuth provider</p>
+          <button
+            onClick={() => runStep(1)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+          >
+            Run Step 2
+          </button>
+        </div>
+        {results[1] && (
+          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
+            {results[1]}
+          </pre>
+        )}
+      </div>
+
+      {/* Step 3 */}
+      <div className="border rounded p-4 mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="font-medium">
+            Step 3: Create password (for salt/derivation)
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              id="password-inbox"
+              ref={passwordInputRef}
+              type={showPassword ? "text" : "password"}
+              className="border rounded px-3 py-1 text-black bg-white"
+              placeholder="Enter your password"
+            />
+            <button
+              type="button"
+              className="text-sm px-2 py-1.5 border rounded bg-gray-200 hover:bg-gray-300 text-black"
+              onClick={() => setShowPassword((prev) => !prev)}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+            <button
+              onClick={() => runStep(2)}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+            >
+              Run Step 3
+            </button>
           </div>
-        ))}
+        </div>
+        {results[2] && (
+          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
+            {results[2]}
+          </pre>
+        )}
+      </div>
+
+      {/* Step 4 */}
+      <div className="border rounded p-4 mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="font-medium">Step 4: Derive zkLogin address</p>
+          <button
+            onClick={() => runStep(3)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+          >
+            Run Step 4
+          </button>
+        </div>
+        {results[3] && (
+          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
+            {results[3]}
+          </pre>
+        )}
+      </div>
+
+      {/* Step 5 */}
+      <div className="border rounded p-4 mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="font-medium">Step 5: Generate zero-knowledge proof</p>
+          <button
+            onClick={() => runStep(4)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+          >
+            Run Step 5
+          </button>
+        </div>
+        {results[4] && (
+          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
+            {results[4]}
+          </pre>
+        )}
+      </div>
+
+      {/* Step 6 */}
+      <div className="border rounded p-4 mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <p className="font-medium">Step 6: Sign transaction with zk proof</p>
+          <button
+            onClick={() => runStep(5)}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+          >
+            Run Step 6
+          </button>
+        </div>
+        {results[5] && (
+          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
+            {results[5]}
+          </pre>
+        )}
       </div>
     </main>
   );
