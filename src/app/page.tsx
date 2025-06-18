@@ -88,11 +88,10 @@ export default function ZkLoginPage() {
 
   const steps = [
     "Step 1: Generate ephemeral key pair, JWT randomness, and nonce",
-    "Step 2: Get JWT from OAuth provider",
-    "Step 3: Register or fetch salt",
-    "Step 4: Derive zkLogin address",
-    "Step 5: Generate zero-knowledge proof",
-    "Step 6: Sign transaction with zk proof",
+    "Step 2: Get JWT from OAuth provider (We only need iss, sub, aud)",
+    "Step 3: Create password (for salt/derivation) and derive zkLogin address",
+    "Step 4: Generate zero-knowledge proof",
+    "Step 5: Sign transaction with zk proof",
   ];
 
   const runStep = async (stepIndex: number) => {
@@ -197,6 +196,7 @@ export default function ZkLoginPage() {
             setResults((prev) => {
               const newResults = [...prev];
               newResults[2] = `Password (userSalt) saved as bigint.\nDerived zkLogin address: ${derivedAddress}`;
+              newResults[3] = null; // Clear step 4 result since merged
               return newResults;
             });
           } else {
@@ -204,6 +204,7 @@ export default function ZkLoginPage() {
               const newResults = [...prev];
               newResults[2] =
                 "Please ensure both JWT and password are available.";
+              newResults[3] = null;
               return newResults;
             });
           }
@@ -211,29 +212,10 @@ export default function ZkLoginPage() {
           setResults((prev) => {
             const newResults = [...prev];
             newResults[2] = `Error converting password to bigint: ${err}`;
+            newResults[3] = null;
             return newResults;
           });
         }
-        break;
-      }
-      case 3: {
-        if (!jwt) {
-          setResults((prev) => {
-            const newResults = [...prev];
-            newResults[3] =
-              "Error: No JWT data available. Please complete Step 2 first.";
-            return newResults;
-          });
-          return;
-        }
-
-        setResults((prev) => {
-          const newResults = [...prev];
-          newResults[3] = `Deriving zkLogin address using JWT claims:\nSub: ${
-            jwt.sub ?? ""
-          }`;
-          return newResults;
-        });
         break;
       }
       case 4: {
@@ -286,9 +268,7 @@ export default function ZkLoginPage() {
       {/* Step 1 */}
       <div className="border rounded p-4 mb-6">
         <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">
-            Step 1: Generate ephemeral key pair, JWT randomness, and nonce
-          </p>
+          <p className="font-medium">{steps[0]}</p>
           <button
             onClick={() => runStep(0)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
@@ -324,9 +304,7 @@ export default function ZkLoginPage() {
       {/* Step 3 */}
       <div className="border rounded p-4 mb-6">
         <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">
-            Step 3: Create password (for salt/derivation)
-          </p>
+          <p className="font-medium">{steps[2]}</p>
           <div className="flex items-center gap-2">
             <input
               id="password-inbox"
@@ -360,30 +338,12 @@ export default function ZkLoginPage() {
       {/* Step 4 */}
       <div className="border rounded p-4 mb-6">
         <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">Step 4: Derive zkLogin address</p>
-          <button
-            onClick={() => runStep(3)}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-          >
-            Run Step 4
-          </button>
-        </div>
-        {results[3] && (
-          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[3]}
-          </pre>
-        )}
-      </div>
-
-      {/* Step 5 */}
-      <div className="border rounded p-4 mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">Step 5: Generate zero-knowledge proof</p>
+          <p className="font-medium">{steps[3]}</p>
           <button
             onClick={() => runStep(4)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
           >
-            Run Step 5
+            Run Step 4
           </button>
         </div>
         {results[4] && (
@@ -393,15 +353,15 @@ export default function ZkLoginPage() {
         )}
       </div>
 
-      {/* Step 6 */}
+      {/* Step 5 */}
       <div className="border rounded p-4 mb-6">
         <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">Step 6: Sign transaction with zk proof</p>
+          <p className="font-medium">{steps[4]}</p>
           <button
             onClick={() => runStep(5)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
           >
-            Run Step 6
+            Run Step 5
           </button>
         </div>
         {results[5] && (
