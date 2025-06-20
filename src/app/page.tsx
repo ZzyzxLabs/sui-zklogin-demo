@@ -9,26 +9,9 @@ import { jwtToAddress } from "@mysten/sui/zklogin";
 import { Transaction } from "@mysten/sui/transactions";
 import { Signer } from "@mysten/sui/cryptography";
 import { genAddressSeed, getZkLoginSignature } from "@mysten/sui/zklogin";
-
-interface JwtPayload {
-  iss?: string;
-  sub?: string; //Subject ID
-  aud?: string[] | string;
-  exp?: number;
-  nbf?: number;
-  iat?: number;
-  jti?: string;
-}
-
-interface Step1Data {
-  maxEpoch: number;
-  publicKey: string;
-  privateKey: string;
-  randomness: string;
-  nonce: string;
-  validityEndTime: number;
-  validityDuration: number;
-}
+import { JwtPayload, Step1Data } from "./types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function ZkLoginPage() {
   const [results, setResults] = useState<(string | null)[]>(
@@ -104,11 +87,11 @@ export default function ZkLoginPage() {
   }, []);
 
   const steps = [
-    "Step 1: Generate ephemeral key pair, JWT randomness, and nonce",
-    "Step 2: Get JWT from OAuth provider (We only need iss, sub, aud)",
-    "Step 3: Create password (for salt/derivation) and derive zkLogin address",
-    "Step 4: Generate zero-knowledge proof",
-    "Step 5: Sign transaction with zk proof",
+    "Generate ephemeral key pair, JWT randomness, and nonce",
+    "Get JWT from OAuth provider (We only need iss, sub, aud)",
+    "Create password (for salt/derivation) and derive zkLogin address",
+    "Generate zero-knowledge proof",
+    "Sign transaction with zk proof",
   ];
 
   const runStep = async (stepIndex: number) => {
@@ -341,112 +324,109 @@ export default function ZkLoginPage() {
 
   return (
     <main className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">zkLogin Demo</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">zkLogin Demo</h1>
 
-      {/* Step 1 */}
-      <div className="border rounded p-4 mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">{steps[0]}</p>
-          <button
-            onClick={() => runStep(0)}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-          >
-            Run Step 1
-          </button>
-        </div>
-        {results[0] && (
-          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[0]}
-          </pre>
-        )}
-      </div>
+      <div className="space-y-6">
+        {/* Step 1 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <span>Step 1: {steps[0]}</span>
+              <Button onClick={() => runStep(0)}>Run Step 1</Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results[0] && (
+              <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
+                {results[0]}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Step 2 */}
-      <div className="border rounded p-4 mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">{steps[1]}</p>
-          <button
-            onClick={() => runStep(1)}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-          >
-            Run Step 2
-          </button>
-        </div>
-        {results[1] && (
-          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[1]}
-          </pre>
-        )}
-      </div>
+        {/* Step 2 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <span>Step 2: {steps[1]}</span>
+              <Button onClick={() => runStep(1)}>Run Step 2</Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results[1] && (
+              <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
+                {results[1]}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Step 3 */}
-      <div className="border rounded p-4 mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">{steps[2]}</p>
-          <div className="flex items-center gap-2">
-            <input
-              id="password-inbox"
-              ref={passwordInputRef}
-              type={showPassword ? "text" : "password"}
-              className="border rounded px-3 py-1 text-black bg-white"
-              placeholder="Enter your password"
-            />
-            <button
-              type="button"
-              className="text-sm px-2 py-1.5 border rounded bg-gray-200 hover:bg-gray-300 text-black"
-              onClick={() => setShowPassword((prev) => !prev)}
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-            <button
-              onClick={() => runStep(2)}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-            >
-              Run Step 3
-            </button>
-          </div>
-        </div>
-        {results[2] && (
-          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[2]}
-          </pre>
-        )}
-      </div>
+        {/* Step 3 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <span>Step 3: {steps[2]}</span>
+              <div className="flex items-center gap-2">
+                <input
+                  id="password-inbox"
+                  ref={passwordInputRef}
+                  type={showPassword ? "text" : "password"}
+                  className="border rounded px-3 py-1 text-black bg-white"
+                  placeholder="Enter your password"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </Button>
+                <Button onClick={() => runStep(2)}>Run Step 3</Button>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results[2] && (
+              <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
+                {results[2]}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Step 4 */}
-      <div className="border rounded p-4 mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">{steps[3]}</p>
-          <button
-            onClick={() => runStep(3)}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-          >
-            Run Step 4
-          </button>
-        </div>
-        {results[3] && (
-          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[3]}
-          </pre>
-        )}
-      </div>
+        {/* Step 4 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <span>Step 4: {steps[3]}</span>
+              <Button onClick={() => runStep(3)}>Run Step 4</Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results[3] && (
+              <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
+                {results[3]}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Step 5 */}
-      <div className="border rounded p-4 mb-6">
-        <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">{steps[4]}</p>
-          <button
-            onClick={() => runStep(4)}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-          >
-            Run Step 5
-          </button>
-        </div>
-        {results[4] && (
-          <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[4]}
-          </pre>
-        )}
+        {/* Step 5 */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <span>Step 5: {steps[4]}</span>
+              <Button onClick={() => runStep(4)}>Run Step 5</Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {results[4] && (
+              <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
+                {results[4]}
+              </pre>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </main>
   );
