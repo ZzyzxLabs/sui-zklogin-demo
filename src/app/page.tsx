@@ -44,7 +44,7 @@ const PROVER_URL = "https://prover-dev.mystenlabs.com/v1";
 const STEPS = [
   "Generate ephemeral key pair, JWT randomness, and nonce",
   "Get JWT from OAuth provider (We only need iss, sub, aud)",
-  "Create password (for salt/derivation) and derive zkLogin address",
+  "Generate random salt and derive zkLogin address",
   "Generate zero-knowledge proof",
   "Sign transaction with zk proof",
 ];
@@ -248,14 +248,13 @@ export default function ZkLoginPage() {
     // Use implicit flow: response_type=id_token, redirect_uri is frontend
     const redirectUri = process.env.NEXT_PUBLIC_BASE_URL;
     const scope = "openid";
-    const nonceParam = btoa(JSON.stringify({ nonce }));
 
     const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     authUrl.searchParams.append("client_id", clientId);
     authUrl.searchParams.append("response_type", "id_token");
     authUrl.searchParams.append("redirect_uri", redirectUri || "");
     authUrl.searchParams.append("scope", scope);
-    authUrl.searchParams.append("nonce", nonceParam);
+    authUrl.searchParams.append("nonce", nonce);
 
     setResults((prev) => {
       const newResults = [...prev];
@@ -268,7 +267,7 @@ export default function ZkLoginPage() {
   };
 
   // ========================================================================
-  // STEP 3: Create password and derive zkLogin address
+  // STEP 3: Generate random salt and derive zkLogin address
   // ========================================================================
 
   const executeStep3 = async () => {
@@ -283,11 +282,16 @@ export default function ZkLoginPage() {
     }
 
     try {
-      // Convert password to bigint and store in sessionStorage
-      const hexString = Array.from(inputValue)
-        .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
-        .join("");
-      const saltBigInt = BigInt("0x" + hexString);
+      // Generate a random 16-byte salt
+      const randomBytes = new Uint8Array(16);
+      crypto.getRandomValues(randomBytes);
+      const saltBigInt = BigInt(
+        "0x" +
+          Array.from(randomBytes)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("")
+      );
+
       setUserSalt(saltBigInt.toString());
       sessionStorage.setItem("userSalt", saltBigInt.toString());
 
@@ -298,14 +302,14 @@ export default function ZkLoginPage() {
         setAddress(derivedAddress);
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[2] = `Password (userSalt) saved as bigint.\nDerived zkLogin address: ${derivedAddress}`;
+          newResults[2] = `Random 16-byte salt generated: ${saltBigInt.toString()}\nDerived zkLogin address: ${derivedAddress}`;
           newResults[3] = null; // Clear step 4 result since merged
           return newResults;
         });
       } else {
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[2] = "Please ensure both JWT and password are available.";
+          newResults[2] = "Please ensure both JWT and salt are available.";
           newResults[3] = null;
           return newResults;
         });
@@ -313,7 +317,7 @@ export default function ZkLoginPage() {
     } catch (err) {
       setResults((prev) => {
         const newResults = [...prev];
-        newResults[2] = `Error converting password to bigint: ${err}`;
+        newResults[2] = `Error generating salt: ${err}`;
         newResults[3] = null;
         return newResults;
       });
@@ -348,9 +352,10 @@ export default function ZkLoginPage() {
         new Ed25519PublicKey(step1Data.publicKey)
       );
 
+      const base64Details = base64ToDecimalString(extendedEphemeralPublicKey);
       requestBody = {
         jwt: idToken as string,
-        extendedEphemeralPublicKey: extendedEphemeralPublicKey,
+        extendedEphemeralPublicKey: base64Details,
         maxEpoch: step1Data.maxEpoch,
         jwtRandomness: step1Data.randomness,
         salt: userSaltStr,
