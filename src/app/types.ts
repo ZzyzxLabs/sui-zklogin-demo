@@ -8,10 +8,14 @@ export interface JwtPayload {
   jti?: string;
 }
 
+export interface Ed25519KeypairData {
+  publicKey: Uint8Array;
+  secretKey: Uint8Array;
+}
+
 export interface Step1Data {
   maxEpoch: number;
-  publicKey: string;
-  privateKey: string;
+  keypairData: Ed25519KeypairData;
   randomness: string;
   nonce: string;
   validityEndTime: number;

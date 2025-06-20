@@ -13,10 +13,12 @@ import { jwtToAddress } from "@mysten/sui/zklogin";
 import { Transaction } from "@mysten/sui/transactions";
 import { Signer } from "@mysten/sui/cryptography";
 import { genAddressSeed, getZkLoginSignature } from "@mysten/sui/zklogin";
-import { JwtPayload, Step1Data } from "./types";
+import { JwtPayload, Step1Data, Ed25519KeypairData } from "./types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -61,6 +63,7 @@ export default function ZkLoginPage() {
   const [results, setResults] = useState<(string | null)[]>(
     Array(5).fill(null)
   );
+  const [loading, setLoading] = useState<boolean[]>(Array(5).fill(false));
   const [jwt, setJwt] = useState<JwtPayload | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
   const [ephemeralKeyPair, setEphemeralKeyPair] =
@@ -81,13 +84,24 @@ export default function ZkLoginPage() {
   useEffect(() => {
     const savedStep1Data = sessionStorage.getItem("step1Data");
     if (savedStep1Data) {
-      const step1Data: Step1Data = JSON.parse(savedStep1Data);
+      const step1Data: Step1Data = JSON.parse(savedStep1Data, (key, value) => {
+        if (key === "publicKey" || key === "secretKey") {
+          return new Uint8Array(value);
+        }
+        return value;
+      });
       setResults((prev) => {
         const newResults = [...prev];
         const validityEndDate = new Date(step1Data.validityEndTime);
-        newResults[0] = `Max Epoch: ${step1Data.maxEpoch}\nPublic Key: ${
-          step1Data.publicKey
-        }\nPrivate Key: ${step1Data.privateKey}\nRandomness: ${
+        const publicKeyBase64 = Buffer.from(
+          step1Data.keypairData.publicKey
+        ).toString("base64");
+        const privateKeyBase64 = Buffer.from(
+          step1Data.keypairData.secretKey
+        ).toString("base64");
+        newResults[0] = `Max Epoch: ${
+          step1Data.maxEpoch
+        }\nPublic Key: ${publicKeyBase64}\nPrivate Key: ${privateKeyBase64}\nRandomness: ${
           step1Data.randomness
         }\nNonce: ${
           step1Data.nonce
@@ -136,22 +150,38 @@ export default function ZkLoginPage() {
   // ========================================================================
 
   const runStep = async (stepIndex: number) => {
-    switch (stepIndex) {
-      case 0:
-        await executeStep1();
-        break;
-      case 1:
-        await executeStep2();
-        break;
-      case 2:
-        await executeStep3();
-        break;
-      case 3:
-        await executeStep4();
-        break;
-      case 4:
-        await executeStep5();
-        break;
+    // Set loading state for this step
+    setLoading((prev) => {
+      const newLoading = [...prev];
+      newLoading[stepIndex] = true;
+      return newLoading;
+    });
+
+    try {
+      switch (stepIndex) {
+        case 0:
+          await executeStep1();
+          break;
+        case 1:
+          await executeStep2();
+          break;
+        case 2:
+          await executeStep3();
+          break;
+        case 3:
+          await executeStep4();
+          break;
+        case 4:
+          await executeStep5();
+          break;
+      }
+    } finally {
+      // Clear loading state for this step
+      setLoading((prev) => {
+        const newLoading = [...prev];
+        newLoading[stepIndex] = false;
+        return newLoading;
+      });
     }
   };
 
@@ -185,21 +215,31 @@ export default function ZkLoginPage() {
       // Save step 1 data to sessionStorage
       const step1Data: Step1Data = {
         maxEpoch,
-        publicKey: publicKey.toBase64(),
-        privateKey: privateKey,
+        keypairData: {
+          publicKey: publicKey.toRawBytes(),
+          secretKey: new Uint8Array(Buffer.from(privateKey, "base64")),
+        },
         randomness,
         nonce,
         validityEndTime,
         validityDuration,
       };
-      sessionStorage.setItem("step1Data", JSON.stringify(step1Data));
+      sessionStorage.setItem(
+        "step1Data",
+        JSON.stringify(step1Data, (key, value) => {
+          if (value instanceof Uint8Array) {
+            return Array.from(value);
+          }
+          return value;
+        })
+      );
 
       setResults((prev) => {
         const newResults = [...prev];
         const validityEndDate = new Date(step1Data.validityEndTime);
-        newResults[0] = `Max Epoch: ${step1Data.maxEpoch}\nPublic Key: ${
-          step1Data.publicKey
-        }\nPrivate Key: ${step1Data.privateKey}\nRandomness: ${
+        newResults[0] = `Max Epoch: ${
+          step1Data.maxEpoch
+        }\nPublic Key: ${publicKey.toBase64()}\nPrivate Key: ${privateKey}\nRandomness: ${
           step1Data.randomness
         }\nNonce: ${
           step1Data.nonce
@@ -258,7 +298,7 @@ export default function ZkLoginPage() {
 
     setResults((prev) => {
       const newResults = [...prev];
-      newResults[1] = `Redirecting to Google OAuth...\nAuth URL: ${authUrl.toString()}`;
+      newResults[1] = `Redirecting to Google OAuth...`;
       return newResults;
     });
 
@@ -345,12 +385,20 @@ export default function ZkLoginPage() {
     let requestBody: any;
 
     try {
-      const step1Data = JSON.parse(step1DataStr);
-      console.log("step1Data.publicKey", step1Data.publicKey);
+      const step1Data = JSON.parse(step1DataStr, (key, value) => {
+        if (key === "publicKey" || key === "secretKey") {
+          return new Uint8Array(value);
+        }
+        return value;
+      });
+      console.log(
+        "step1Data.keypairData.publicKey",
+        step1Data.keypairData.publicKey
+      );
 
       // Extract public and private keys from step1Data
       const extendedEphemeralPublicKey = getExtendedEphemeralPublicKey(
-        new Ed25519PublicKey(step1Data.publicKey)
+        new Ed25519PublicKey(step1Data.keypairData.publicKey)
       );
 
       const base64Details = base64ToDecimalString(extendedEphemeralPublicKey);
@@ -437,10 +485,15 @@ export default function ZkLoginPage() {
 
     try {
       const zkProof = JSON.parse(zkProofStr);
-      const step1Data = JSON.parse(step1DataStr);
+      const step1Data = JSON.parse(step1DataStr, (key, value) => {
+        if (key === "publicKey" || key === "secretKey") {
+          return new Uint8Array(value);
+        }
+        return value;
+      });
       const ephemeralKeyPair = new Ed25519Keypair({
-        publicKey: step1Data.publicKey,
-        secretKey: step1Data.privateKey,
+        publicKey: step1Data.keypairData.publicKey,
+        secretKey: step1Data.keypairData.secretKey,
       });
 
       const client = new SuiClient({ url: FULLNODE_URL });
@@ -476,6 +529,11 @@ export default function ZkLoginPage() {
         userSignature,
       });
 
+      client.executeTransactionBlock({
+        transactionBlock: bytes,
+        signature: zkLoginSignature,
+      });
+
       setResults((prev) => {
         const newResults = [...prev];
         newResults[4] = `✅ Transaction signed with zkLogin!\n\nUser Signature: ${userSignature}\nZkLogin Signature: ${zkLoginSignature}\nTransaction Bytes: ${bytes}`;
@@ -505,11 +563,28 @@ export default function ZkLoginPage() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               <span>Step 1: {STEPS[0]}</span>
-              <Button onClick={() => runStep(0)}>Run Step 1</Button>
+              <Button onClick={() => runStep(0)} disabled={loading[0]}>
+                {loading[0] ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  "Run Step 1"
+                )}
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {results[0] && (
+            {loading[0] && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="ml-2 text-gray-600">
+                  Generating ephemeral key pair and nonce...
+                </span>
+              </div>
+            )}
+            {results[0] && !loading[0] && (
               <>
                 <Alert variant="destructive" className="mb-4">
                   <AlertTitle>
@@ -530,11 +605,28 @@ export default function ZkLoginPage() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               <span>Step 2: {STEPS[1]}</span>
-              <Button onClick={() => runStep(1)}>Run Step 2</Button>
+              <Button onClick={() => runStep(1)} disabled={loading[1]}>
+                {loading[1] ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Redirecting...
+                  </>
+                ) : (
+                  "Google OAuth Login"
+                )}
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {results[1] && (
+            {loading[1] && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="ml-2 text-gray-600">
+                  Redirecting to Google OAuth...
+                </span>
+              </div>
+            )}
+            {results[1] && !loading[1] && (
               <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
                 {results[1]}
               </pre>
@@ -548,26 +640,44 @@ export default function ZkLoginPage() {
             <CardTitle className="flex justify-between items-center">
               <span>Step 3: {STEPS[2]}</span>
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   id="password-inbox"
                   ref={passwordInputRef}
                   type={showPassword ? "text" : "password"}
-                  className="border rounded px-3 py-1 text-black bg-white"
                   placeholder="Enter your password"
+                  disabled={loading[2]}
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowPassword((prev) => !prev)}
+                  disabled={loading[2]}
                 >
                   {showPassword ? "Hide" : "Show"}
                 </Button>
-                <Button onClick={() => runStep(2)}>Run Step 3</Button>
               </div>
+              <Button onClick={() => runStep(2)} disabled={loading[2]}>
+                {loading[2] ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  "Run Step 3"
+                )}
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {results[2] && (
+            {loading[2] && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="ml-2 text-gray-600">
+                  Generating salt and deriving address...
+                </span>
+              </div>
+            )}
+            {results[2] && !loading[2] && (
               <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
                 {results[2]}
               </pre>
@@ -580,11 +690,28 @@ export default function ZkLoginPage() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               <span>Step 4: {STEPS[3]}</span>
-              <Button onClick={() => runStep(3)}>Run Step 4</Button>
+              <Button onClick={() => runStep(3)} disabled={loading[3]}>
+                {loading[3] ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating Proof...
+                  </>
+                ) : (
+                  "Run Step 4"
+                )}
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {results[3] && (
+            {loading[3] && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="ml-2 text-gray-600">
+                  Generating zero-knowledge proof...
+                </span>
+              </div>
+            )}
+            {results[3] && !loading[3] && (
               <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
                 {results[3]}
               </pre>
@@ -597,11 +724,28 @@ export default function ZkLoginPage() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               <span>Step 5: {STEPS[4]}</span>
-              <Button onClick={() => runStep(4)}>Run Step 5</Button>
+              <Button onClick={() => runStep(4)} disabled={loading[4]}>
+                {loading[4] ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing...
+                  </>
+                ) : (
+                  "Run Step 5"
+                )}
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {results[4] && (
+            {loading[4] && (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <span className="ml-2 text-gray-600">
+                  Signing transaction with zkLogin...
+                </span>
+              </div>
+            )}
+            {results[4] && !loading[4] && (
               <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
                 {results[4]}
               </pre>
