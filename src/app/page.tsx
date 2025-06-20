@@ -285,13 +285,14 @@ export default function ZkLoginPage() {
       // Generate a random 16-byte salt
       const randomBytes = new Uint8Array(16);
       crypto.getRandomValues(randomBytes);
-      const saltBigInt = BigInt(
-        "0x" +
-          Array.from(randomBytes)
-            .map((b) => b.toString(16).padStart(2, "0"))
-            .join("")
-      );
+      // const saltBigInt = BigInt(
+      //   "0x" +
+      //     Array.from(randomBytes)
+      //       .map((b) => b.toString(16).padStart(2, "0"))
+      //       .join("")
+      // );
 
+      const saltBigInt = "0x00000000000000000000000000000000";
       setUserSalt(saltBigInt.toString());
       sessionStorage.setItem("userSalt", saltBigInt.toString());
 
