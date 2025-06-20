@@ -6,6 +6,9 @@ import { generateRandomness, generateNonce } from "@mysten/sui/zklogin";
 import { SuiClient } from "@mysten/sui/client";
 import { jwtDecode } from "jwt-decode";
 import { jwtToAddress } from "@mysten/sui/zklogin";
+import { Transaction } from "@mysten/sui/transactions";
+import { Signer } from "@mysten/sui/cryptography";
+import { genAddressSeed, getZkLoginSignature } from "@mysten/sui/zklogin";
 
 interface JwtPayload {
   iss?: string;
@@ -23,18 +26,23 @@ interface Step1Data {
   privateKey: string;
   randomness: string;
   nonce: string;
+  validityEndTime: number;
+  validityDuration: number;
 }
 
 export default function ZkLoginPage() {
   const [results, setResults] = useState<(string | null)[]>(
-    Array(6).fill(null)
+    Array(5).fill(null)
   );
   const [jwt, setJwt] = useState<JwtPayload | null>(null);
   const [idToken, setIdToken] = useState<string | null>(null);
   const [ephemeralKeyPair, setEphemeralKeyPair] =
     useState<Ed25519Keypair | null>(null);
+
+  // Step 1
   const [maxEpoch, setMaxEpoch] = useState<number | null>(null);
-  const [randomness, setRandomness] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  const [userSalt, setUserSalt] = useState<string | null>(null);
 
   // Remove userSalt state, use ref instead
   const passwordInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +55,16 @@ export default function ZkLoginPage() {
       const step1Data: Step1Data = JSON.parse(savedStep1Data);
       setResults((prev) => {
         const newResults = [...prev];
-        newResults[0] = `⚠️ WARNING: This is a demo. DO NOT use these keys for real money transactions! ⚠️\n\nMax Epoch: ${maxEpoch}\nPublic Key: ${step1Data.publicKey}\nPrivate Key: ${step1Data.privateKey}\nRandomness: ${step1Data.randomness}\nNonce: ${step1Data.nonce}`;
+        const validityEndDate = new Date(step1Data.validityEndTime);
+        newResults[0] = `⚠️ WARNING: This is a demo. DO NOT use these keys for real money transactions! ⚠️\n\nMax Epoch: ${
+          step1Data.maxEpoch
+        }\nPublic Key: ${step1Data.publicKey}\nPrivate Key: ${
+          step1Data.privateKey
+        }\nRandomness: ${step1Data.randomness}\nNonce: ${
+          step1Data.nonce
+        }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
+          step1Data.validityDuration / (1000 * 60 * 60)
+        )} hours`;
         return newResults;
       });
     }
@@ -104,10 +121,19 @@ export default function ZkLoginPage() {
 
         const maxEpoch = Number(epoch) + 2; // this means the ephemeral key will be active for 2 epochs from now.
         const ephemeralKeyPair = new Ed25519Keypair();
+        setEphemeralKeyPair(ephemeralKeyPair);
         const publicKey = ephemeralKeyPair.getPublicKey();
         const privateKey = ephemeralKeyPair.getSecretKey();
         const randomness = generateRandomness();
         const nonce = generateNonce(publicKey, maxEpoch, randomness);
+
+        // Calculate validity period
+        const currentEpochStartTime = Number(epochStartTimestampMs);
+        const epochsRemaining = maxEpoch - Number(epoch);
+        const validityEndTime =
+          currentEpochStartTime + epochsRemaining * Number(epochDurationMs);
+        const validityEndDate = new Date(validityEndTime);
+        const validityDuration = epochsRemaining * Number(epochDurationMs);
 
         // Save step 1 data to sessionStorage
         const step1Data: Step1Data = {
@@ -116,12 +142,23 @@ export default function ZkLoginPage() {
           privateKey: privateKey,
           randomness,
           nonce,
+          validityEndTime,
+          validityDuration,
         };
         sessionStorage.setItem("step1Data", JSON.stringify(step1Data));
 
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[0] = `⚠️ WARNING: This is a demo. DO NOT use these keys for real money transactions! ⚠️\n\nMax Epoch: ${maxEpoch}\nPublic Key: ${step1Data.publicKey}\nPrivate Key: ${step1Data.privateKey}\nRandomness: ${step1Data.randomness}\nNonce: ${step1Data.nonce}`;
+          const validityEndDate = new Date(step1Data.validityEndTime);
+          newResults[0] = `⚠️ WARNING: This is a demo. DO NOT use these keys for real money transactions! ⚠️\n\nMax Epoch: ${
+            step1Data.maxEpoch
+          }\nPublic Key: ${step1Data.publicKey}\nPrivate Key: ${
+            step1Data.privateKey
+          }\nRandomness: ${step1Data.randomness}\nNonce: ${
+            step1Data.nonce
+          }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
+            step1Data.validityDuration / (1000 * 60 * 60)
+          )} hours`;
           return newResults;
         });
         break;
@@ -188,11 +225,13 @@ export default function ZkLoginPage() {
             .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
             .join("");
           const saltBigInt = BigInt("0x" + hexString);
+          setUserSalt(saltBigInt.toString());
           sessionStorage.setItem("userSalt", saltBigInt.toString());
           // If idToken and userSalt are present, derive the address
           const userSaltStr = sessionStorage.getItem("userSalt");
           if (idToken && userSaltStr) {
             const derivedAddress = jwtToAddress(idToken, userSaltStr);
+            setAddress(derivedAddress);
             setResults((prev) => {
               const newResults = [...prev];
               newResults[2] = `Password (userSalt) saved as bigint.\nDerived zkLogin address: ${derivedAddress}`;
@@ -218,6 +257,25 @@ export default function ZkLoginPage() {
         }
         break;
       }
+      case 3: {
+        if (!jwt) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[3] =
+              "Error: No JWT data available. Please complete Step 2 first.";
+            return newResults;
+          });
+          return;
+        }
+        setResults((prev) => {
+          const newResults = [...prev];
+          newResults[3] = `Generating zero-knowledge proof using JWT claims:\nSub: ${
+            jwt.sub ?? ""
+          }`;
+          return newResults;
+        });
+        break;
+      }
       case 4: {
         if (!jwt) {
           setResults((prev) => {
@@ -228,34 +286,54 @@ export default function ZkLoginPage() {
           });
           return;
         }
-
-        setResults((prev) => {
-          const newResults = [...prev];
-          newResults[4] = `Generating zero-knowledge proof using JWT claims:\nSub: ${
-            jwt.sub ?? ""
-          }`;
-          return newResults;
-        });
-        break;
-      }
-      case 5: {
-        if (!jwt) {
+        if (!address) {
           setResults((prev) => {
             const newResults = [...prev];
-            newResults[5] =
-              "Error: No JWT data available. Please complete Step 2 first.";
+            newResults[4] =
+              "Error: No derived address available. Please complete Step 3 first.";
             return newResults;
           });
           return;
         }
+        if (!ephemeralKeyPair) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[4] =
+              "Error: No ephemeral key pair available. Please complete Step 1 first.";
+            return newResults;
+          });
+          return;
+        }
+        try {
+          const client = new SuiClient({
+            url: "https://fullnode.testnet.sui.io",
+          });
+          const txb = new Transaction();
+          txb.setSender(address);
+          const { bytes, signature: userSignature } = await txb.sign({
+            client,
+            signer: ephemeralKeyPair as Signer, // This must be the same ephemeral key pair used in the ZKP request
+          });
 
-        setResults((prev) => {
-          const newResults = [...prev];
-          newResults[5] = `Signing transaction using zk proof and JWT data:\nSub: ${
-            jwt.sub ?? ""
-          }`;
-          return newResults;
-        });
+          const addressSeed = genAddressSeed(
+            BigInt(userSalt ?? ""),
+            "sub",
+            jwt.sub ?? "",
+            jwt.aud as string
+          ).toString();
+
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[4] = `Transaction signed!\nSignature: ${userSignature}\nBytes: ${bytes}`;
+            return newResults;
+          });
+        } catch (err) {
+          setResults((prev) => {
+            const newResults = [...prev];
+            newResults[4] = `Error signing transaction: ${err}`;
+            return newResults;
+          });
+        }
         break;
       }
     }
@@ -286,7 +364,7 @@ export default function ZkLoginPage() {
       {/* Step 2 */}
       <div className="border rounded p-4 mb-6">
         <div className="flex justify-between items-center mb-2">
-          <p className="font-medium">Step 2: Get JWT from OAuth provider</p>
+          <p className="font-medium">{steps[1]}</p>
           <button
             onClick={() => runStep(1)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
@@ -340,15 +418,15 @@ export default function ZkLoginPage() {
         <div className="flex justify-between items-center mb-2">
           <p className="font-medium">{steps[3]}</p>
           <button
-            onClick={() => runStep(4)}
+            onClick={() => runStep(3)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
           >
             Run Step 4
           </button>
         </div>
-        {results[4] && (
+        {results[3] && (
           <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[4]}
+            {results[3]}
           </pre>
         )}
       </div>
@@ -358,15 +436,15 @@ export default function ZkLoginPage() {
         <div className="flex justify-between items-center mb-2">
           <p className="font-medium">{steps[4]}</p>
           <button
-            onClick={() => runStep(5)}
+            onClick={() => runStep(4)}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
           >
             Run Step 5
           </button>
         </div>
-        {results[5] && (
+        {results[4] && (
           <pre className="mt-2 bg-gray-100 p-3 rounded whitespace-pre-wrap text-sm text-black">
-            {results[5]}
+            {results[4]}
           </pre>
         )}
       </div>
