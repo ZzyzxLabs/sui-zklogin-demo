@@ -16,6 +16,7 @@ import { genAddressSeed, getZkLoginSignature } from "@mysten/sui/zklogin";
 import { JwtPayload, Step1Data } from "./types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -84,11 +85,11 @@ export default function ZkLoginPage() {
       setResults((prev) => {
         const newResults = [...prev];
         const validityEndDate = new Date(step1Data.validityEndTime);
-        newResults[0] = `⚠️ WARNING: This is a demo. DO NOT use these keys for real money transactions! ⚠️\n\nMax Epoch: ${
-          step1Data.maxEpoch
-        }\nPublic Key: ${step1Data.publicKey}\nPrivate Key: ${
-          step1Data.privateKey
-        }\nRandomness: ${step1Data.randomness}\nNonce: ${
+        newResults[0] = `Max Epoch: ${step1Data.maxEpoch}\nPublic Key: ${
+          step1Data.publicKey
+        }\nPrivate Key: ${step1Data.privateKey}\nRandomness: ${
+          step1Data.randomness
+        }\nNonce: ${
           step1Data.nonce
         }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
           step1Data.validityDuration / (1000 * 60 * 60)
@@ -196,11 +197,11 @@ export default function ZkLoginPage() {
       setResults((prev) => {
         const newResults = [...prev];
         const validityEndDate = new Date(step1Data.validityEndTime);
-        newResults[0] = `⚠️ WARNING: This is a demo. DO NOT use these keys for real money transactions! ⚠️\n\nMax Epoch: ${
-          step1Data.maxEpoch
-        }\nPublic Key: ${step1Data.publicKey}\nPrivate Key: ${
-          step1Data.privateKey
-        }\nRandomness: ${step1Data.randomness}\nNonce: ${
+        newResults[0] = `Max Epoch: ${step1Data.maxEpoch}\nPublic Key: ${
+          step1Data.publicKey
+        }\nPrivate Key: ${step1Data.privateKey}\nRandomness: ${
+          step1Data.randomness
+        }\nNonce: ${
           step1Data.nonce
         }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
           step1Data.validityDuration / (1000 * 60 * 60)
@@ -503,9 +504,17 @@ export default function ZkLoginPage() {
           </CardHeader>
           <CardContent>
             {results[0] && (
-              <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
-                {results[0]}
-              </pre>
+              <>
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTitle>
+                    WARNING: This is a demo. DO NOT use these keys for real
+                    money transactions!
+                  </AlertTitle>
+                </Alert>
+                <pre className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-sm text-black border">
+                  {results[0]}
+                </pre>
+              </>
             )}
           </CardContent>
         </Card>
