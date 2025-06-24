@@ -1,19 +1,19 @@
 // app/layout.tsx
-import './globals.css'
+import "./globals.css";
 
 export const metadata = {
-  title: 'zkLogin Demo',
-  description: 'Step-by-step walkthrough of zkLogin flow',
-}
+  title: "Sui zkLogin Demo",
+  description: "Step-by-step walkthrough of zkLogin flow",
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
       <body>{children}</body>
     </html>
-  )
+  );
 }

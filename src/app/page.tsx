@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Ed25519Keypair, Ed25519PublicKey } from "@mysten/sui/keypairs/ed25519";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
   generateRandomness,
   generateNonce,
@@ -42,16 +42,18 @@ function base64ToDecimalString(base64: string): string {
  */
 function ensureHexAddress(address: string): string {
   // Remove any non-hex characters and ensure it starts with 0x
-  let cleanAddress = address.replace(/[^0-9a-fA-F]/g, '');
+  let cleanAddress = address.replace(/[^0-9a-fA-F]/g, "");
 
   // If it doesn't start with 0x, add it
-  if (!cleanAddress.startsWith('0x')) {
-    cleanAddress = '0x' + cleanAddress;
+  if (!cleanAddress.startsWith("0x")) {
+    cleanAddress = "0x" + cleanAddress;
   }
 
   // Ensure it's the correct length (42 characters including 0x)
   if (cleanAddress.length !== 42) {
-    throw new Error(`Invalid address length: ${cleanAddress.length}, expected 42`);
+    throw new Error(
+      `Invalid address length: ${cleanAddress.length}, expected 42`
+    );
   }
 
   return cleanAddress.toLowerCase();
@@ -123,7 +125,6 @@ export default function ZkLoginPage() {
       // show restored secret key
       console.log("Restored secret key:", restoredKeyPair.getSecretKey());
 
-
       // === Restore other step1 data ===
       setMaxEpoch(step1Data.maxEpoch);
       setRandomness(step1Data.randomness);
@@ -134,19 +135,22 @@ export default function ZkLoginPage() {
         // display keys in base64 for public key and bech32 for private key
         const publicKeyRawBytes = step1Data.keypairData.publicKey;
         const privateKeyRawBytes = step1Data.keypairData.secretKey;
-        const publicKeyBase64 = Buffer.from(publicKeyRawBytes).toString('base64');
+        const publicKeyBase64 =
+          Buffer.from(publicKeyRawBytes).toString("base64");
         const privateKeyBech32 = restoredKeyPair.getSecretKey(); // Use the original bech32 format
-        newResults[0] = `Max Epoch: ${step1Data.maxEpoch
-          }\nPublic Key (base64): ${publicKeyBase64}\nPrivate Key (bech32): ${privateKeyBech32}\nRandomness: ${step1Data.randomness
-          }\nNonce: ${step1Data.nonce
-          }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
-            step1Data.validityDuration / (1000 * 60 * 60)
-          )} hours`;
+        newResults[0] = `Max Epoch: ${
+          step1Data.maxEpoch
+        }\nPublic Key (base64): ${publicKeyBase64}\nPrivate Key (bech32): ${privateKeyBech32}\nRandomness: ${
+          step1Data.randomness
+        }\nNonce: ${
+          step1Data.nonce
+        }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
+          step1Data.validityDuration / (1000 * 60 * 60)
+        )} hours`;
         return newResults;
       });
     }
   }, [results[0]]);
-
 
   // Handle id_token from OAuth callback
   useEffect(() => {
@@ -163,8 +167,14 @@ export default function ZkLoginPage() {
         try {
           const parsedData = JSON.parse(step1DataAfterOAuth);
           console.log("Parsed step1 data after OAuth:", parsedData);
-          console.log("Public key after OAuth:", parsedData.keypairData?.publicKey);
-          console.log("Secret key after OAuth:", parsedData.keypairData?.secretKey);
+          console.log(
+            "Public key after OAuth:",
+            parsedData.keypairData?.publicKey
+          );
+          console.log(
+            "Secret key after OAuth:",
+            parsedData.keypairData?.secretKey
+          );
         } catch (error) {
           console.log("Error parsing step1 data after OAuth:", error);
         }
@@ -190,14 +200,20 @@ export default function ZkLoginPage() {
               });
               privateKeyDisplay = restoredKeyPair.getSecretKey();
             } catch (error) {
-              console.log("Error parsing step1 data for private key display:", error);
+              console.log(
+                "Error parsing step1 data for private key display:",
+                error
+              );
             }
           }
 
           setResults((prev) => {
             const newResults = [...prev];
-            newResults[1] = `JWT received:\nIssuer: ${payload.iss ?? ""
-              }\nSubject: ${payload.sub ?? ""}\nAudience: ${payload.aud ?? ""}\n\nPrivate Key (bech32): ${privateKeyDisplay}`;
+            newResults[1] = `JWT received:\nIssuer: ${
+              payload.iss ?? ""
+            }\nSubject: ${payload.sub ?? ""}\nAudience: ${
+              payload.aud ?? ""
+            }\n\nPrivate Key (bech32): ${privateKeyDisplay}`;
             return newResults;
           });
 
@@ -286,14 +302,15 @@ export default function ZkLoginPage() {
 
       // Decode the bech32-encoded secret key to get raw bytes
       const decodedSecretKey = bech32.bech32.decode(privateKey);
-      const privateKeyBytes = Uint8Array.from(bech32.bech32.fromWords(decodedSecretKey.words)).slice(1);
+      const privateKeyBytes = Uint8Array.from(
+        bech32.bech32.fromWords(decodedSecretKey.words)
+      ).slice(1);
       const publicKeyBytes = publicKey.toRawBytes();
 
       // Create the 64-byte secret key: 32 bytes secret scalar + 32 bytes public key
       const fullSecretKeyBytes = new Uint8Array(64);
       fullSecretKeyBytes.set(privateKeyBytes, 0);
       fullSecretKeyBytes.set(publicKeyBytes, 32);
-
 
       // Calculate validity period
       const currentEpochStartTime = Number(epochStartTimestampMs);
@@ -309,9 +326,15 @@ export default function ZkLoginPage() {
         secretKey: fullSecretKeyBytes,
       });
       console.log("Test keypair:", testKeypair);
-      console.log("Test keypair public key:", testKeypair.getPublicKey().toBase64());
+      console.log(
+        "Test keypair public key:",
+        testKeypair.getPublicKey().toBase64()
+      );
       console.log("Test keypair secret key:", testKeypair.getSecretKey());
-      console.log("Original vs Test secret key match:", privateKey === testKeypair.getSecretKey());
+      console.log(
+        "Original vs Test secret key match:",
+        privateKey === testKeypair.getSecretKey()
+      );
 
       // Save step 1 data to sessionStorage
       const step1Data: Step1Data = {
@@ -341,14 +364,18 @@ export default function ZkLoginPage() {
         const publicKeyRawBytes = step1Data.keypairData.publicKey;
         const privateKeyRawBytes = step1Data.keypairData.secretKey;
         // display keys in base64 for public key and bech32 for private key
-        const publicKeyBase64 = Buffer.from(publicKeyRawBytes).toString('base64');
+        const publicKeyBase64 =
+          Buffer.from(publicKeyRawBytes).toString("base64");
         const privateKeyBech32 = ephemeralKeyPair.getSecretKey(); // Use the original bech32 format
-        newResults[0] = `Max Epoch: ${step1Data.maxEpoch
-          }\nPublic Key (base64): ${publicKeyBase64}\nPrivate Key (bech32): ${privateKeyBech32}\nRandomness: ${step1Data.randomness
-          }\nNonce: ${step1Data.nonce
-          }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
-            step1Data.validityDuration / (1000 * 60 * 60)
-          )} hours`;
+        newResults[0] = `Max Epoch: ${
+          step1Data.maxEpoch
+        }\nPublic Key (base64): ${publicKeyBase64}\nPrivate Key (bech32): ${privateKeyBech32}\nRandomness: ${
+          step1Data.randomness
+        }\nNonce: ${
+          step1Data.nonce
+        }\n\nValidity Period:\n- Valid until: ${validityEndDate.toLocaleString()}\n- Duration: ${Math.round(
+          step1Data.validityDuration / (1000 * 60 * 60)
+        )} hours`;
         return newResults;
       });
     } catch (error) {
@@ -475,7 +502,13 @@ export default function ZkLoginPage() {
   const executeStep4 = async () => {
     const userSaltStr = sessionStorage.getItem("userSalt");
 
-    if (!idToken || !userSaltStr || !ephemeralKeyPair || !maxEpoch || !randomness) {
+    if (
+      !idToken ||
+      !userSaltStr ||
+      !ephemeralKeyPair ||
+      !maxEpoch ||
+      !randomness
+    ) {
       setResults((prev) => {
         const newResults = [...prev];
         newResults[3] = "Missing required data. Run Steps 1-3 first.";
@@ -492,14 +525,15 @@ export default function ZkLoginPage() {
       console.log("Using restored public key:", publicKey.toBase64());
 
       // Extract public and private keys from restored keypair
-      const extendedEphemeralPublicKey = getExtendedEphemeralPublicKey(publicKey);
+      const extendedEphemeralPublicKey =
+        getExtendedEphemeralPublicKey(publicKey);
 
       const base64Details = base64ToDecimalString(extendedEphemeralPublicKey);
 
       // Debug: Check address seed consistency
       const addressSeedForProver = genAddressSeed(
         BigInt(userSaltStr),
-        'sub',
+        "sub",
         jwt?.sub ?? "",
         Array.isArray(jwt?.aud) ? jwt.aud[0] : jwt?.aud ?? ""
       ).toString();
@@ -601,7 +635,9 @@ export default function ZkLoginPage() {
 
       // Use the restored keypair from state instead of reconstructing
       if (!ephemeralKeyPair) {
-        throw new Error("Ephemeral keypair not found. Please run Step 1 first.");
+        throw new Error(
+          "Ephemeral keypair not found. Please run Step 1 first."
+        );
       }
 
       // show restored keypair in base64
@@ -613,17 +649,34 @@ export default function ZkLoginPage() {
       });
       const step1DataSecretKeyBech32 = step1DataRestoredKeypair.getSecretKey();
       console.log("Step1 data secret key (bech32):", step1DataSecretKeyBech32);
-      console.log("Restored keypair public key:", ephemeralKeyPair.getPublicKey().toBase64());
-      console.log("Restored keypair secret key:", ephemeralKeyPair.getSecretKey());
+      console.log(
+        "Restored keypair public key:",
+        ephemeralKeyPair.getPublicKey().toBase64()
+      );
+      console.log(
+        "Restored keypair secret key:",
+        ephemeralKeyPair.getSecretKey()
+      );
 
       // Assertions to check correctness
-      const originalPublicKeyBase64 = Buffer.from(step1Data.keypairData.publicKey).toString('base64');
-      const restoredPublicKeyBase64 = ephemeralKeyPair.getPublicKey().toBase64();
+      const originalPublicKeyBase64 = Buffer.from(
+        step1Data.keypairData.publicKey
+      ).toString("base64");
+      const restoredPublicKeyBase64 = ephemeralKeyPair
+        .getPublicKey()
+        .toBase64();
       const originalSecretKeyBech32 = step1DataRestoredKeypair.getSecretKey();
       const restoredSecretKeyBech32 = ephemeralKeyPair.getSecretKey();
 
-      console.log("Public key lengths match:", step1Data.keypairData.publicKey.length === ephemeralKeyPair.getPublicKey().toRawBytes().length);
-      console.log("Secret key lengths match:", step1Data.keypairData.secretKey.length === 64);
+      console.log(
+        "Public key lengths match:",
+        step1Data.keypairData.publicKey.length ===
+          ephemeralKeyPair.getPublicKey().toRawBytes().length
+      );
+      console.log(
+        "Secret key lengths match:",
+        step1Data.keypairData.secretKey.length === 64
+      );
 
       // Check if the data from sessionStorage matches what we expect
       const step1DataFromStorage = sessionStorage.getItem("step1Data");
@@ -631,27 +684,46 @@ export default function ZkLoginPage() {
 
       // Assertions
       if (originalPublicKeyBase64 !== restoredPublicKeyBase64) {
-        throw new Error(`Public key mismatch! Original: ${originalPublicKeyBase64}, Restored: ${restoredPublicKeyBase64}`);
+        throw new Error(
+          `Public key mismatch! Original: ${originalPublicKeyBase64}, Restored: ${restoredPublicKeyBase64}`
+        );
       }
 
-      if (step1Data.keypairData.publicKey.length !== ephemeralKeyPair.getPublicKey().toRawBytes().length) {
-        throw new Error(`Public key length mismatch! Original: ${step1Data.keypairData.publicKey.length}, Restored: ${ephemeralKeyPair.getPublicKey().toRawBytes().length}`);
+      if (
+        step1Data.keypairData.publicKey.length !==
+        ephemeralKeyPair.getPublicKey().toRawBytes().length
+      ) {
+        throw new Error(
+          `Public key length mismatch! Original: ${
+            step1Data.keypairData.publicKey.length
+          }, Restored: ${ephemeralKeyPair.getPublicKey().toRawBytes().length}`
+        );
       }
 
       if (step1Data.keypairData.secretKey.length !== 64) {
-        throw new Error(`Secret key length mismatch! Expected 64 bytes, got ${step1Data.keypairData.secretKey.length}`);
+        throw new Error(
+          `Secret key length mismatch! Expected 64 bytes, got ${step1Data.keypairData.secretKey.length}`
+        );
       }
 
       if (originalSecretKeyBech32 !== restoredSecretKeyBech32) {
-        throw new Error(`Secret key mismatch! Original: ${originalSecretKeyBech32}, Restored: ${restoredSecretKeyBech32}`);
+        throw new Error(
+          `Secret key mismatch! Original: ${originalSecretKeyBech32}, Restored: ${restoredSecretKeyBech32}`
+        );
       }
 
       console.log("✅ All keypair assertions passed!");
       console.log("=== END KEYPAIR DEBUGGING ===");
 
       console.log("Restored ephemeralKeyPair:", ephemeralKeyPair);
-      console.log("Original public key from step1:", step1Data.keypairData.publicKey);
-      console.log("Original secret key from step1:", step1Data.keypairData.secretKey);
+      console.log(
+        "Original public key from step1:",
+        step1Data.keypairData.publicKey
+      );
+      console.log(
+        "Original secret key from step1:",
+        step1Data.keypairData.secretKey
+      );
 
       const provider = new SuiClient({ url: FULLNODE_URL });
 
@@ -661,9 +733,11 @@ export default function ZkLoginPage() {
         try {
           const balance = await provider.getBalance({
             owner: address,
-            coinType: "0x2::sui::SUI"
+            coinType: "0x2::sui::SUI",
           });
-          balanceInfo = `\n💰 Current Balance: ${Number(balance.totalBalance) / 1000000000} SUI\n`;
+          balanceInfo = `\n💰 Current Balance: ${
+            Number(balance.totalBalance) / 1000000000
+          } SUI\n`;
         } catch (balanceError) {
           console.error("Error fetching balance:", balanceError);
           balanceInfo = "\n❌ Could not fetch balance\n";
@@ -694,17 +768,24 @@ export default function ZkLoginPage() {
 
       console.log("=== TRANSACTION DEBUGGING ===");
       console.log("Transaction bytes length:", bytes.length);
-      console.log("Transaction bytes (hex):", Buffer.from(bytes).toString('hex'));
+      console.log(
+        "Transaction bytes (hex):",
+        Buffer.from(bytes).toString("hex")
+      );
       console.log("Transaction sender:", address);
       console.log("=== END TRANSACTION DEBUGGING ===");
 
       // Sign the transaction with the ephemeral keypair
-      const { signature: userSignature } = await ephemeralKeyPair.signTransaction(bytes);
+      const { signature: userSignature } =
+        await ephemeralKeyPair.signTransaction(bytes);
 
       console.log("=== SIGNATURE DEBUGGING ===");
       console.log("User signature length:", userSignature.length);
       console.log("User signature (base64):", userSignature);
-      console.log("User signature (hex):", Buffer.from(userSignature, 'base64').toString('hex'));
+      console.log(
+        "User signature (hex):",
+        Buffer.from(userSignature, "base64").toString("hex")
+      );
       console.log("=== END SIGNATURE DEBUGGING ===");
 
       // Verify the signature locally
@@ -712,7 +793,9 @@ export default function ZkLoginPage() {
       let verificationError: Error | null = null;
 
       try {
-        isSignatureValid = await ephemeralKeyPair.getPublicKey().verifyTransaction(bytes, userSignature);
+        isSignatureValid = await ephemeralKeyPair
+          .getPublicKey()
+          .verifyTransaction(bytes, userSignature);
         console.log("Local signature verification result:", isSignatureValid);
       } catch (error) {
         verificationError = error as Error;
@@ -723,8 +806,14 @@ export default function ZkLoginPage() {
 
       if (!isSignatureValid) {
         console.log("=== SIGNATURE VERIFICATION FAILURE ANALYSIS ===");
-        console.log("Public key used for verification:", ephemeralKeyPair.getPublicKey().toBase64());
-        console.log("Transaction bytes used for verification:", Buffer.from(bytes).toString('hex'));
+        console.log(
+          "Public key used for verification:",
+          ephemeralKeyPair.getPublicKey().toBase64()
+        );
+        console.log(
+          "Transaction bytes used for verification:",
+          Buffer.from(bytes).toString("hex")
+        );
         console.log("Signature used for verification:", userSignature);
 
         if (verificationError) {
@@ -733,22 +822,31 @@ export default function ZkLoginPage() {
 
         // Try to verify with a different method to see if it's a method issue
         try {
-          const alternativeVerification = ephemeralKeyPair.getPublicKey().verify(bytes, userSignature);
-          console.log("Alternative verification result:", alternativeVerification);
+          const alternativeVerification = ephemeralKeyPair
+            .getPublicKey()
+            .verify(bytes, userSignature);
+          console.log(
+            "Alternative verification result:",
+            alternativeVerification
+          );
         } catch (altError) {
           console.log("Alternative verification error:", altError);
         }
 
         console.log("=== END FAILURE ANALYSIS ===");
-        throw new Error(`Local signature verification failed! Error: ${verificationError?.message || 'Unknown error'}`);
+        throw new Error(
+          `Local signature verification failed! Error: ${
+            verificationError?.message || "Unknown error"
+          }`
+        );
       }
 
       // Create the zkLogin signature
       const addressSeed = genAddressSeed(
         BigInt(userSaltStr),
-        'sub',
+        "sub",
         jwt?.sub ?? "",
-        Array.isArray(jwt?.aud) ? jwt.aud[0] : jwt?.aud ?? "",
+        Array.isArray(jwt?.aud) ? jwt.aud[0] : jwt?.aud ?? ""
       ).toString();
 
       console.log("Address seed for signature:", addressSeed);
@@ -792,7 +890,7 @@ export default function ZkLoginPage() {
 
   return (
     <main className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-center">zkLogin Demo</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">Sui zkLogin Demo</h1>
 
       <div className="space-y-6">
         {/* Step 1 */}
