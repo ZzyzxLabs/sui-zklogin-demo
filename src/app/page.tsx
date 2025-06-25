@@ -95,10 +95,6 @@ export default function ZkLoginPage() {
   const [randomness, setRandomness] = useState<string | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [userSalt, setUserSalt] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Refs
-  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   // ========================================================================
   // EFFECTS
@@ -403,21 +399,13 @@ export default function ZkLoginPage() {
   // ========================================================================
 
   const executeStep3 = async () => {
-    const inputValue = passwordInputRef.current?.value || "";
-    if (!inputValue) {
-      setResults((prev) => {
-        const newResults = [...prev];
-        newResults[2] = "Please enter a password.";
-        return newResults;
-      });
-      return;
-    }
-
     try {
-      // Generate a random 16-byte salt
-      const randomBytes = new Uint8Array(16);
-      crypto.getRandomValues(randomBytes);
+      // Generate a random 16-digit integer salt
+      const min = 1000000000000000; // 16 digits starting with 1
+      const max = 9999999999999999; // 16 digits ending with 9
+      const generatedSalt = Math.floor(Math.random() * (max - min + 1)) + min;
 
+      // Use hardcoded salt for address derivation
       const saltBigInt = "0x00000000000000000000000000000000";
       setUserSalt(saltBigInt.toString());
       sessionStorage.setItem("userSalt", saltBigInt.toString());
@@ -436,7 +424,7 @@ export default function ZkLoginPage() {
             owner: derivedAddress,
             coinType: "0x2::sui::SUI",
           });
-          balanceInfo = `\n💰 Balance: ${
+          balanceInfo = `\nBalance: ${
             Number(balance.totalBalance) / 1000000000
           } SUI`;
         } catch (balanceError) {
@@ -445,7 +433,7 @@ export default function ZkLoginPage() {
 
         setResults((prev) => {
           const newResults = [...prev];
-          newResults[2] = `Random 16-byte salt generated: ${saltBigInt.toString()}\nDerived zkLogin address: ${derivedAddress}${balanceInfo}`;
+          newResults[2] = `Generated 16-digit salt: ${generatedSalt}\nUsed salt for address: ${saltBigInt.toString()}\nDerived zkLogin address: ${derivedAddress}${balanceInfo}`;
           newResults[3] = null; // Clear step 4 result since merged
           return newResults;
         });
@@ -542,11 +530,11 @@ export default function ZkLoginPage() {
 
       setResults((prev) => {
         const newResults = [...prev];
-        newResults[3] = `✅ Proof generated successfully.\nPartial output:\n${JSON.stringify(
+        newResults[3] = `Proof generated successfully.\nPartial output:\n${JSON.stringify(
           zkProof,
           null,
           2
-        ).slice(0, 800)}...`;
+        ).slice(0, 500)}...`;
         return newResults;
       });
 
@@ -849,23 +837,6 @@ export default function ZkLoginPage() {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               <span>Step 3: {STEPS[2]}</span>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="password-inbox"
-                  ref={passwordInputRef}
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  disabled={loading[2]}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  disabled={loading[2]}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </Button>
-              </div>
               <Button onClick={() => runStep(2)} disabled={loading[2]}>
                 {loading[2] ? (
                   <>
